@@ -1,0 +1,8 @@
+[
+{
+  "directory": "/Users/mchu/Documents/TUD/GEO-1016/geo-1016-assignments/build",
+  "command": "/usr/bin/clang++   -g -std=gnu++11 -arch arm64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.0.sdk -mmacosx-version-min=14.7 -o CMakeFiles/Imaging.dir/main.cpp.o -c /Users/mchu/Documents/TUD/GEO-1016/geo-1016-assignments/01/no_viewer/main.cpp",
+  "file": "/Users/mchu/Documents/TUD/GEO-1016/geo-1016-assignments/01/no_viewer/main.cpp",
+  "output": "CMakeFiles/Imaging.dir/main.cpp.o"
+}
+]

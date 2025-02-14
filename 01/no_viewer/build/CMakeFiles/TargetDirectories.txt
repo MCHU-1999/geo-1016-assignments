@@ -1,0 +1,3 @@
+/Users/mchu/Documents/TUD/GEO-1016/geo-1016-assignments/build/CMakeFiles/Imaging.dir
+/Users/mchu/Documents/TUD/GEO-1016/geo-1016-assignments/build/CMakeFiles/edit_cache.dir
+/Users/mchu/Documents/TUD/GEO-1016/geo-1016-assignments/build/CMakeFiles/rebuild_cache.dir
