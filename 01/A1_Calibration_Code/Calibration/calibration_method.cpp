@@ -30,6 +30,16 @@ using namespace easy3d;
 
 
 
+double sin_from_cos(double cos_theta, bool positive = true) {
+    double sin_theta = std::sqrt(1 - cos_theta * cos_theta);
+    return positive ? sin_theta : -sin_theta;
+}
+
+double cot_from_cos(double cos_theta, bool positive = true) {
+    double cot_theta =  cos_theta / sin_from_cos(cos_theta);
+    return positive ? cot_theta : -cot_theta;
+}
+
 /**
  * TODO: Finish this function for calibrating a camera from the corresponding 3D-2D point pairs.
  *       You may define a few functions for some sub-tasks.
@@ -55,6 +65,7 @@ bool Calibration::calibration(
     // implementation starts ...
     try {
         // check if input is valid (e.g., number of correspondences >= 6, sizes of 2D/3D points must match)
+
         int size_2d = points_2d.size();
         int size_3d = points_3d.size();
         if (size_2d < 6) throw std::runtime_error("number of correspondences must >= 6, got " + std::to_string(size_2d));
@@ -83,20 +94,53 @@ bool Calibration::calibration(
         }
         std::cout << "P: \n" << P << std::endl;
 
-        
-        // TODO: solve for M (the whole projection matrix, i.e., M = K * [R, t]) using SVD decomposition.
-        //   Optional: you can check if your M is correct by applying M on the 3D points. If correct, the projected point
-        //             should be very close to your input images points.
+        // solve for M (the whole projection matrix, i.e., M = K * [R, t]) using SVD decomposition.
+        // Optional: you can check if your M is correct by applying M on the 3D points. If correct, the projected point
+        //           should be very close to your input images points.
 
-        // TODO: extract intrinsic parameters from M.
+        Matrix U(2*size_3d, 2*size_3d, 0.0);
+        Matrix S(2*size_3d, 12, 0.0);
+        Matrix V(12, 12, 0.0);
+        svd_decompose(P, U, S, V);
 
-        // TODO: extract extrinsic parameters from M.
+        Matrix svd_M(3, 4, V.get_column(11).data());
+        Matrix33 A(svd_M);
+        Matrix b(3, 1, svd_M.get_column(3).data());
+        // std::cout << "The SVD-solved matrix M: \n" << svd_M << std::endl;
+        // std::cout << "The SVD-solved matrix A: \n" << A << std::endl;
+        // std::cout << "The SVD-solved matrix b: \n" << b << std::endl;
 
-        // TODO: make sure the recovered parameters are passed to the corresponding variables (fx, fy, cx, cy, s, R, and t)
+        // extract intrinsic parameters from M.
+
+        Vector3D a1xa3 = cross(A.get_row(0), A.get_row(2));
+        Vector3D a2xa3 = cross(A.get_row(1), A.get_row(2));
+
+        double rho = 1 / A.get_row(2).length();
+        cx = std::pow(rho, 2) * dot(A.get_row(0), A.get_row(2));
+        cy = std::pow(rho, 2) * dot(A.get_row(1), A.get_row(2));
+        double cos_theta = (-1) * dot(a1xa3, a2xa3) / (a1xa3.length() * a2xa3.length());
+        fx = std::pow(rho, 2) * a1xa3.length() * sin_from_cos(cos_theta);
+        fy = std::pow(rho, 2) * a2xa3.length();
+        s = fx * cot_from_cos(cos_theta);
+
+        // extract extrinsic parameters from M.
         
+        Matrix K(3, 3, std::vector<double>({fx, s, cx, 0, fy, cy, 0, 0, 1}));
+        Vector3D r1 = a2xa3.normalize();
+        Vector3D r3 = rho * A.get_row(2);
+        Vector3D r2 = cross(r3, r1);
+        R.set_row(0, r1);
+        R.set_row(1, r2);
+        R.set_row(2, r3);
+
+        Matrix invK;
+        if (inverse(K, invK)) {
+            t = (rho * invK * b).get_column(0);
+        } else {
+            throw std::runtime_error("expected a square matrix, got " + std::to_string(K.rows()) + " by " + std::to_string(K.cols()));
+        }
         
-        
-        return false;
+        return true;
     }
     catch(const std::exception& e) {
         std::cerr << e.what() << '\n';
