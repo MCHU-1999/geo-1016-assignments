@@ -41,27 +41,29 @@ double cot_from_cos(double cos_theta, bool positive = true) {
 }
 
 /**
- * @param points_3d input: An array of 3D points.
- * @param points_2d input: An array of 2D image points.
- * @param fx output: focal length (i.e., K[0][0]).
- * @param fy output: focal length (i.e., K[1][1]).
- * @param cx output: x component of the principal point (i.e., K[0][2]).
- * @param cy output: y component of the principal point (i.e., K[1][2]).
- * @param s output: skew factor (i.e., K[0][1]), which is s = -alpha * cot(theta).
- * @param R output: the 3x3 rotation matrix encoding camera rotation.
- * @param t output：a 3D vector encoding camera translation.
+ * Performs camera calibration given 3D-2D point correspondences.
+ * 
+ * @param[in] points_3d input: An array of 3D points.
+ * @param[in] points_2d input: An array of 2D image points.
+ * @param[out] fx output: focal length (i.e., K[0][0]).
+ * @param[out] fy output: focal length (i.e., K[1][1]).
+ * @param[out] cx output: x component of the principal point (i.e., K[0][2]).
+ * @param[out] cy output: y component of the principal point (i.e., K[1][2]).
+ * @param[out] s output: skew factor (i.e., K[0][1]), which is s = -alpha * cot(theta).
+ * @param[out] R output: the 3x3 rotation matrix encoding camera rotation.
+ * @param[out] t output: a 3D vector encoding camera translation.
  * @return True on success, otherwise false. On success, the camera parameters are returned by fx, fy, cx, cy, skew, R, and t).
  */
 bool Calibration::calibration(
-    const std::vector<Vector3D>& points_3d, /// input: An array of 3D points.
-    const std::vector<Vector2D>& points_2d, /// input: An array of 2D image points.
-    double& fx,     /// output: focal length (i.e., K[0][0]).
-    double& fy,     /// output: focal length (i.e., K[1][1]).
-    double& cx,     /// output: x component of the principal point (i.e., K[0][2]).
-    double& cy,     /// output: y component of the principal point (i.e., K[1][2]).
-    double& s,      /// output: skew factor (i.e., K[0][1]), which is s = -alpha * cot(theta).
-    Matrix33& R,    /// output: the 3x3 rotation matrix encoding camera rotation.
-    Vector3D& t     /// output：a 3D vector encoding camera translation.
+    const std::vector<Vector3D>& points_3d, 
+    const std::vector<Vector2D>& points_2d,
+    double& fx,
+    double& fy,
+    double& cx,
+    double& cy,
+    double& s,
+    Matrix33& R,
+    Vector3D& t
 ) 
 {
     //--------------------------------------------------------------------------------------------------------------
