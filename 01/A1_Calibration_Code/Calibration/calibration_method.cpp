@@ -83,17 +83,17 @@ bool Calibration::calibration(
 
         for (int i = 0; i < size_3d; i++) {                             // For 3D-2D point correspondence 
             Vector4D P_i = points_3d[i].homogeneous();                  // Transform 3D point P_i into homogeneous coordinates (4D vector)
-            Vector4D x_i_P_i = P_i * points_2d[i].x() * (-1);           // Calculate -(x_i * P_i)
-            Vector4D y_i_P_i = P_i * points_2d[i].y() * (-1);           // Calculate -(y_i * P_i)
+            Vector4D u_P_i = P_i * points_2d[i].x() * (-1);           // Calculate -(x_i * P_i)
+            Vector4D v_P_i = P_i * points_2d[i].y() * (-1);           // Calculate -(y_i * P_i)
             
             tmp.insert(tmp.end(), P_i.data(), P_i.data()+4);            // Add P_i as homogenous coordinates at end of tmp (before empty)
             tmp.insert(tmp.end(), 4, 0);                                // Add four zeroes at end of tmp
-            tmp.insert(tmp.end(), x_i_P_i.data(), x_i_P_i.data()+4);    // Add x_i_P_i at end of tmp
+            tmp.insert(tmp.end(), u_P_i.data(), u_P_i.data()+4);    // Add u_P_i at end of tmp
             P.set_row(2*i, tmp);                                        // Insert tmp, now 12 values long, into matrix P
             tmp.clear();                                                // Clear tmp of its contents
             tmp.insert(tmp.end(), 4, 0);                                // Add four zeroes at end of tmp (before empty)
             tmp.insert(tmp.end(), P_i.data(), P_i.data()+4);            // Add P_i as homogenous coordinates at end of tmp
-            tmp.insert(tmp.end(), y_i_P_i.data(), y_i_P_i.data()+4);    // Add y_i_P_i at end of tmp
+            tmp.insert(tmp.end(), v_P_i.data(), v_P_i.data()+4);    // Add v_P_i at end of tmp
             P.set_row(2*i+1, tmp);                                      // Insert tmp, now 12 values long, into matrix P
             tmp.clear();                                                // Clear tmp of its contents
         }
