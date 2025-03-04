@@ -199,8 +199,8 @@ namespace easy3d {
 		glfwWindowHint(GLFW_VISIBLE, GL_FALSE);
 		glfwWindowHint(GLFW_RESIZABLE, resizable ? GL_TRUE : GL_FALSE);
 
-		int w = 960;
-		int h = 800;
+		int w = 1920;
+		int h = 1600;
 		GLFWwindow*	window = nullptr;
 		if (full_screen) {
 			GLFWmonitor *monitor = glfwGetPrimaryMonitor();
