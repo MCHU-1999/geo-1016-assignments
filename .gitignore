@@ -1,3 +1,5 @@
 .DS_Store
 .vscode
 build/
+01/A1_Calibration_Code/cmake-build-debug/
+01/A1_Calibration_Code/.idea/
