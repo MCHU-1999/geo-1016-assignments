@@ -40,6 +40,46 @@ double cot_from_cos(double cos_theta, bool positive = true) {
     return positive ? cot_theta : -cot_theta;
 }
 
+// Free function: Projects 3D points to 2D using the computed camera matrix.
+std::vector<Vector2D> project_3D_to_2D(
+    const std::vector<Vector3D>& points_3d,
+    const Matrix33& K,
+    const Matrix33& R,
+    const Vector3D& t
+) {
+    std::vector<Vector2D> projected_points;
+    Matrix M(3, 4);
+    for (int i = 0; i < 3; i++) {
+        M.set_row(i, { R(i, 0), R(i, 1), R(i, 2), t[i] });
+    }
+    M = K * M;  // M = K * [R | t]
+    for (const auto& point_3d : points_3d) {
+        Vector4D P_homogeneous = point_3d.homogeneous();
+        Vector3D projected = M * P_homogeneous;
+        double x = projected.x() / projected.z();
+        double y = projected.y() / projected.z();
+        projected_points.emplace_back(x, y);
+    }
+    return projected_points;
+}
+
+// Free function: Computes the reprojection error between projected points and the original image points.
+double compute_reprojection_error(
+    const std::vector<Vector2D>& projected_points,
+    const std::vector<Vector2D>& image_points
+) {
+    assert(projected_points.size() == image_points.size());
+    double total_error = 0.0;
+    int n = projected_points.size();
+    for (int i = 0; i < n; ++i) {
+        double dx = projected_points[i].x() - image_points[i].x();
+        double dy = projected_points[i].y() - image_points[i].y();
+        total_error += dx * dx + dy * dy;
+    }
+    return std::sqrt(total_error / n);
+}
+
+
 /**
  * Performs camera calibration given 3D-2D point correspondences.
  * 
@@ -144,6 +184,15 @@ bool Calibration::calibration(
         } else {
             throw std::runtime_error("expected a square matrix, got " + std::to_string(K.rows()) + " by " + std::to_string(K.cols()));
         }
+        
+        std::vector<Vector2D> projected_2d = project_3D_to_2D(points_3d, K, R, t);
+        double err =  compute_reprojection_error(projected_2d, points_2d);
+
+        std::cout << "the projected \t the ground truth: \n";
+        for (size_t i = 0; i < projected_2d.size(); i++) {
+            std::cout << projected_2d[i] << "\t" << points_2d[i] << std::endl;
+        }
+        std::cout << "the error (sum):\n" << err << std::endl;
         
         return true;
     }
