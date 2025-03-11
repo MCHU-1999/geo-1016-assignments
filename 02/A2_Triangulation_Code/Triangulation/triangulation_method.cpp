@@ -35,6 +35,64 @@ using namespace easy3d;
  * @return True on success, otherwise false. On success, the reconstructed 3D points must be written to 'points_3d'
  *      and the recovered relative pose must be written to R and t.
  */
+
+void normalisePoints(const std::vector<Vector2D>& points, std::vector<Vector2D>& norm_points, Matrix33& T) {
+
+        // Compute the centroid of the points
+    Vector2D centroid (0.0, 0.0);
+    for (const auto& p : points) {
+        centroid += p;
+    }
+    int N = points.size();
+    centroid /= N;
+
+    // Normalise the scale, the mean distance from the centroid should be sqrt(2)
+    double scale = 0.0;
+    for (const auto& p : points) {
+        scale += (p - centroid).norm();
+    }
+    scale = sqrt(2.0) / (scale / N);
+
+    // Construct similarity transformation matrix
+    T = Matrix33(scale, 0, -scale * centroid.x(),
+                 0, scale, -scale * centroid.y(),
+                 0, 0, 1);
+
+    // Apply the transformation to the points
+    norm_points.clear();
+    for (const auto& p : points) {
+        Vector3D p_homog = Vector3D(p.x(), p.y(), 1); // Convert to homogeneous coordinates
+        Vector3D p_norm = T * p_homog; // Apply transformation
+        norm_points.emplace_back(p_norm.x(), p_norm.y());
+    }
+}
+
+Matrix33 computeFundamentalMatrix(const std::vector<Vector2D>& points_0, const std::vector<Vector2D>& points_1) {
+    // Set up of matrix A through the point correspondences
+    int N = points_0.size();
+    Matrix A(N, 9);
+
+    for (int i = 0; i < N; ++i) {
+        double x0 = points_0[i].x(), y0 = points_0[i].y();
+        double x1 = points_1[i].x(), y1 = points_1[i].y();
+        A.set_row(i, {x0 * x1, x0 * y1, x0, y0 * x1, y0 * y1, y0, x1, y1, 1});
+    }
+    // Perform SVD on matrix A to solve for the fundamental matrix F
+    Matrix U, S, V;
+    svd_decompose(A, U, S, V);
+    Vector F_vec = V.get_column(V.cols() - 1);
+    Matrix33 F(F_vec[0], F_vec[1], F_vec[2],
+               F_vec[3], F_vec[4], F_vec[5],
+               F_vec[6], F_vec[7], F_vec[8]);
+
+    // Enforce the rank-2 constraint for the fundamental matrix F
+    svd_decompose(F, U, S, V);
+    S.set(2, 2, 0.0);
+    F = U * S * V.transpose();
+
+    return F;
+}
+
 bool Triangulation::triangulation(
         double fx, double fy,     /// input: the focal lengths (same for both cameras)
         double cx, double cy,     /// input: the principal point (same for both cameras)
@@ -133,60 +191,40 @@ bool Triangulation::triangulation(
     // implementation starts ...
 
     // TODO: check if the input is valid (always good because you never known how others will call your function).
+    if (points_0.size() < 8 || points_1.size() < 8 || points_0.size() != points_1.size()) {
+        return false;
+    }
 
     // TODO: Estimate relative pose of two views. This can be subdivided into
 
+    // =============================================================================================================
     // #1 Estimate the fundamental matrix F
-
-    // =============================================================================================================
-    // Step #1.1 Normalisation of the points
     // =============================================================================================================
 
-    void normalisePoints(const std::vector<Vector2D>& points, std::vector<Vector2D>& norm_points, Matrix33& T) {
-
-        // Compute the centroid of the points
-        Vector2D centroid (0.0, 0.0);
-        for (const auto& p : points) {
-            centroid += p;
-        }
-        centroid /= N;
-
-        // Normalise the scale, the mean distance from the centroid should be sqrt(2)
-        double scale = 0.0;
-        for (const auto& p : points) {
-            scale += (p - centroid).norm();
-        }
-        scale = sqrt(2.0) / (scale / N);
-
-        // Construct similarity transformation matrix
-        T = Matrix33(scale, 0, -scale * centroid.x(),
-                     0, scale, -scale * centroid.y(),
-                     0, 0, 1);
-
-        // Apply the transformation to the points
-        norm_points.clear();
-        for (const auto& p : points) {
-            Vector3D p_homog = Vector3D(p.x(), p.y(), 1); // Convert to homogeneous coordinates
-            Vector3D p_norm = T * p_homog; // Apply transformation
-            norm_points.emplace_back(p_norm.x(), p_norm.y());
-        }
-    }
-
-    // Normalize image points
+    // #1.1 Normalisation of the points
     std::vector<Vector2D> norm_points_0, norm_points_1;
     Matrix33 T0, T1;
     normalisePoints(points_0, norm_points_0, T0);
     normalisePoints(points_1, norm_points_1, T1);
 
-    // #1.2 Linear solution (based on SVD)
-    // #1.3 Constraint enforcement (based on SVD). Find the closest rank-2 matrix
+    // #1.2 & 1.3 Linear solution, based on SVD and constraint enforcement, based on SVD
+    Matrix33 F = computeFundamentalMatrix(norm_points_0, norm_points_1);
+
     // #1.4 Denormalisation of matrix F
+    F = T1.transpose() * F * T0;
 
+    // =============================================================================================================
+    // #2 Compute the essential matrix E
+    // =============================================================================================================
 
+    // TODO
 
-    //      - estimate the fundamental matrix F;
-    //      - compute the essential matrix E;
-    //      - recover rotation R and t.
+    // =============================================================================================================
+    // #3 Recover rotation R and t
+    // =============================================================================================================
+
+    // TODO
+
 
     // TODO: Reconstruct 3D points. The main task is
     //      - triangulate a pair of image points (i.e., compute the 3D coordinates for each corresponding point pair)
