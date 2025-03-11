@@ -238,6 +238,6 @@ bool Triangulation::triangulation(
     //       There are a few cases you should return 'false' instead, for example:
     //          - function not implemented yet;
     //          - input not valid (e.g., not enough points, point numbers don't match);
-    //          - encountered failure in any step.
+    //          - encountered failure in any step. !!!! -Daan
     return points_3d.size() > 0;
 }
