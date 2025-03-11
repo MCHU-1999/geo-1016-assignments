@@ -135,6 +135,55 @@ bool Triangulation::triangulation(
     // TODO: check if the input is valid (always good because you never known how others will call your function).
 
     // TODO: Estimate relative pose of two views. This can be subdivided into
+
+    // #1 Estimate the fundamental matrix F
+
+    // =============================================================================================================
+    // Step #1.1 Normalisation of the points
+    // =============================================================================================================
+
+    void normalisePoints(const std::vector<Vector2D>& points, std::vector<Vector2D>& norm_points, Matrix33& T) {
+
+        // Compute the centroid of the points
+        Vector2D centroid (0.0, 0.0);
+        for (const auto& p : points) {
+            centroid += p;
+        }
+        centroid /= N;
+
+        // Normalise the scale, the mean distance from the centroid should be sqrt(2)
+        double scale = 0.0;
+        for (const auto& p : points) {
+            scale += (p - centroid).norm();
+        }
+        scale = sqrt(2.0) / (scale / N);
+
+        // Construct similarity transformation matrix
+        T = Matrix33(scale, 0, -scale * centroid.x(),
+                     0, scale, -scale * centroid.y(),
+                     0, 0, 1);
+
+        // Apply the transformation to the points
+        norm_points.clear();
+        for (const auto& p : points) {
+            Vector3D p_homog = Vector3D(p.x(), p.y(), 1); // Convert to homogeneous coordinates
+            Vector3D p_norm = T * p_homog; // Apply transformation
+            norm_points.emplace_back(p_norm.x(), p_norm.y());
+        }
+    }
+
+    // Normalize image points
+    std::vector<Vector2D> norm_points_0, norm_points_1;
+    Matrix33 T0, T1;
+    normalisePoints(points_0, norm_points_0, T0);
+    normalisePoints(points_1, norm_points_1, T1);
+
+    // #1.2 Linear solution (based on SVD)
+    // #1.3 Constraint enforcement (based on SVD). Find the closest rank-2 matrix
+    // #1.4 Denormalisation of matrix F
+
+
+
     //      - estimate the fundamental matrix F;
     //      - compute the essential matrix E;
     //      - recover rotation R and t.
