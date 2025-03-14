@@ -118,7 +118,9 @@ bool Triangulation::triangulation(
         Matrix U(n_0, n_0, 0.0), S(n_0, 9, 0.0), V(9, 9, 0.0);
         svd_decompose(W, U, S, V);
         Matrix F(3, 3, V.get_column(8).data());
-        Matrix U(3, 3, 0.0), D(3, 3, 0.0), V(3, 3, 0.0);
+        U = Matrix(3, 3, 0.0);
+        V = Matrix(3, 3, 0.0);
+        Matrix D(3, 3, 0.0);
         svd_decompose(F, U, S, V);
         S.set(2, 2, 0.0);
         F = U*S*V;
@@ -129,7 +131,7 @@ bool Triangulation::triangulation(
         Matrix33 E = K.transpose() * F * K;
 
         // recover rotation R and t.
-        
+
 
 
         // TODO: Reconstruct 3D points. The main task is
