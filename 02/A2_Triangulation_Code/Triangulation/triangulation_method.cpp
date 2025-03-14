@@ -51,6 +51,7 @@ void norm_transformation(const std::vector<Vector2D>& points, std::vector<Vector
         0, 0, 1
     );
 
+    norm_points.resize(n);  // <--- Fix: Resize before accessing elements
     for (int i = 0; i < n; i++) {
         norm_points[i] = (scale * points[i]) - norm_centroid;
     }
@@ -63,10 +64,6 @@ Matrix cal_matrix_W (int n, const std::vector<Vector2D> &points_0, const std::ve
         // v_i  = norm_points_0[i].y()
         // u_i' = norm_points_1[i].x()
         // v_i' = norm_points_1[i].y()
-        // Row of W:
-        // u_i'u_i, u_i'v_i, u_i'
-        // v_i'u_i, v_i'v_i, v_i'
-        // u_i    , v_i    , 1
         double u_0 = points_0[i].x(), v_0 = points_0[i].y(), u_1 = points_1[i].x(), v_1 = points_1[i].y();
         W.set_row(i, {
             u_1*u_0, u_1*v_0, u_1,
@@ -117,13 +114,15 @@ bool Triangulation::triangulation(
         Matrix W = cal_matrix_W(n_0, norm_points_0, norm_points_1);
         Matrix U(n_0, n_0, 0.0), S(n_0, 9, 0.0), V(9, 9, 0.0);
         svd_decompose(W, U, S, V);
+
         Matrix F(3, 3, V.get_column(8).data());
         U = Matrix(3, 3, 0.0);
         V = Matrix(3, 3, 0.0);
         Matrix D(3, 3, 0.0);
-        svd_decompose(F, U, S, V);
+        svd_decompose(F, U, D, V);
         S.set(2, 2, 0.0);
-        F = U*S*V;
+
+        F = U*D*V;
         F = T_1.transpose() * F * T_0;
 
         // compute the essential matrix E;
@@ -146,15 +145,9 @@ bool Triangulation::triangulation(
         Matrix33 R1 = U_e * W_matrix * V_e.transpose();
         Matrix33 R2 = U_e * W_matrix.transpose() * V_e.transpose();
 
-        std::cout << R1 << std::endl;
-        std::cout << R2 << std::endl;
-
         // Ensure R has positive determinant (rotation matrix property)
         if (determinant(R1) < 0) R1 = -R1;
         if (determinant(R2) < 0) R2 = -R2;
-
-        std::cout << R1 << std::endl;
-        std::cout << R2 << std::endl;
 
         // Translation is the last column of U (up to scale)
         Vector3D t1(U_e.get_column(2)[0], U_e.get_column(2)[1], U_e.get_column(2)[2]);
@@ -164,14 +157,12 @@ bool Triangulation::triangulation(
         std::vector<Matrix33> rotations = {R1, R1, R2, R2};
         std::vector<Vector3D> translations = {t1, t2, t1, t2};
 
-        // First camera projection matrix (identity rotation, zero translation)
-        Matrix34 P0({
-            fx, 0, cx, 0,
-            0, fy, cy, 0,
-            0, 0, 1, 0
-        });
-
-
+        // Test R and t
+        Vector2D test_point_0 = points_0[0], test_point_1 = points_1[0];
+        for (int i; i < 4; i++){
+            Vector3D P = test_point_0.homogeneous();
+            Vector3D Q = rotations[i]*test_point_1.homogeneous() + translations[i];
+        }
 
 
 
