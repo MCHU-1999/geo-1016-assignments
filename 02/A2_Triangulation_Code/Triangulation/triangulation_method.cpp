@@ -118,18 +118,61 @@ bool Triangulation::triangulation(
         Matrix U(n_0, n_0, 0.0), S(n_0, 9, 0.0), V(9, 9, 0.0);
         svd_decompose(W, U, S, V);
         Matrix F(3, 3, V.get_column(8).data());
-        Matrix U(3, 3, 0.0), D(3, 3, 0.0), V(3, 3, 0.0);
+        U = Matrix(3, 3, 0.0);
+        V = Matrix(3, 3, 0.0);
+        Matrix D(3, 3, 0.0);
         svd_decompose(F, U, S, V);
         S.set(2, 2, 0.0);
         F = U*S*V;
         F = T_1.transpose() * F * T_0;
-        
+
         // compute the essential matrix E;
         Matrix33 K({fx, s, cx, 0, fy, cy, 0, 0, 1});
         Matrix33 E = K.transpose() * F * K;
 
         // recover rotation R and t.
-        
+        Matrix U_e(3, 3, 0.0), V_e(3, 3, 0.0);
+        Matrix S_e(3, 3, 0.0);
+        svd_decompose(E, U_e, S_e, V_e);
+
+        // Define the W matrix
+        Matrix33 W_matrix({
+            0, -1, 0,
+            1, 0, 0,
+            0, 0, 1
+        });
+
+        // Four possible solutions for R and t
+        Matrix33 R1 = U_e * W_matrix * V_e.transpose();
+        Matrix33 R2 = U_e * W_matrix.transpose() * V_e.transpose();
+
+        std::cout << R1 << std::endl;
+        std::cout << R2 << std::endl;
+
+        // Ensure R has positive determinant (rotation matrix property)
+        if (determinant(R1) < 0) R1 = -R1;
+        if (determinant(R2) < 0) R2 = -R2;
+
+        std::cout << R1 << std::endl;
+        std::cout << R2 << std::endl;
+
+        // Translation is the last column of U (up to scale)
+        Vector3D t1(U_e.get_column(2)[0], U_e.get_column(2)[1], U_e.get_column(2)[2]);
+        Vector3D t2 = -t1;
+
+        // Four possible combinations of R and t
+        std::vector<Matrix33> rotations = {R1, R1, R2, R2};
+        std::vector<Vector3D> translations = {t1, t2, t1, t2};
+
+        // First camera projection matrix (identity rotation, zero translation)
+        Matrix34 P0({
+            fx, 0, cx, 0,
+            0, fy, cy, 0,
+            0, 0, 1, 0
+        });
+
+
+
 
 
         // TODO: Reconstruct 3D points. The main task is
