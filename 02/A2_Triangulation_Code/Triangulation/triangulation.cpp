@@ -120,9 +120,10 @@ bool Triangulation::key_press_event(int key, int modifiers) {
         const double cx = 320;   /// TODO: modify cx to see how it affects the reconstruction (e.g., 200, 250, 350, 400)
         const double cy = 240;   /// TODO: modify cy to see how it affects the reconstruction
         const double s = 0.0;    /// TODO: modify s to see how it affects the reconstruction (e.g., 1, 10, 100, 300, 500)
-        LOG(ERROR) << "TODO: tune the parameters (above line " << __LINE__ << " in file 'triangulation.cpp') and see how"
-                      "\n\terrors in camera intrinsic parameters affect the final reconstruction. Please include your findings"
-                      "\n\tand insights in the report";
+        // LOG(ERROR) << "TODO: tune the parameters (above line " << __LINE__ << " in file 'triangulation.cpp') and see how"
+        //               "\n\terrors in camera intrinsic parameters affect the final reconstruction. Please include your findings"
+        //               "\n\tand insights in the report";
+        // std::cout << "Fuck My Life" << std::endl;
         std::vector<Vector3D> points_3d;
         Matrix33 R;
         Vector3D t;
