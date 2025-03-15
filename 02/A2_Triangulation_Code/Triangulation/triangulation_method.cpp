@@ -64,55 +64,67 @@ Matrix cal_matrix_W (int n, const std::vector<Vector2D> &points_0, const std::ve
         // v_i  = norm_points_0[i].y()
         // u_i' = norm_points_1[i].x()
         // v_i' = norm_points_1[i].y()
-        double u_0 = points_0[i].x(), v_0 = points_0[i].y(), u_1 = points_1[i].x(), v_1 = points_1[i].y();
+        double u0 = points_0[i].x(), v0 = points_0[i].y(), u1 = points_1[i].x(), v1 = points_1[i].y();
         W.set_row(i, {
-            u_1*u_0, u_1*v_0, u_1,
-            v_1*u_0, v_1*v_0, v_1,
-            u_0, v_0, 1
+            u1*u0, u1*v0, u1,
+            v1*u0, v1*v0, v1,
+            u0, v0, 1
         });
     }
 
     return W;
 }
 
-
 /**
- * TODO: Finish this function for reconstructing 3D geometry from corresponding image points.
- * @return True on success, otherwise false. On success, the reconstructed 3D points must be written to 'points_3d'
- *      and the recovered relative pose must be written to R and t.
+ * @brief Performs 3D point triangulation from two images.
+ *
+ * Given two sets of 2D point correspondences from two images and known camera intrinsics,
+ * this function reconstructs the 3D positions of the points and estimates the relative
+ * pose (rotation and translation) between the two cameras.
+ *
+ * @param[in] fx Focal length in the x direction (same for both cameras).
+ * @param[in] fy Focal length in the y direction (same for both cameras).
+ * @param[in] cx X-coordinate of the principal point (same for both cameras).
+ * @param[in] cy Y-coordinate of the principal point (same for both cameras).
+ * @param[in] s Skew factor (same for both cameras).
+ * @param[in] points_0 2D image points in the first image.
+ * @param[in] points_1 2D image points in the second image.
+ * @param[out] points_3d Reconstructed 3D points in world coordinates.
+ * @param[out] R 3×3 matrix representing the recovered rotation of the 2nd camera.
+ * @param[out] t 3D vector representing the recovered translation of the 2nd camera.
+ * @return True on success, otherwise false.
  */
 bool Triangulation::triangulation(
-        double fx, double fy,     /// input: the focal lengths (same for both cameras)
-        double cx, double cy,     /// input: the principal point (same for both cameras)
-        double s,                 /// input: the skew factor (same for both cameras)
-        const std::vector<Vector2D> &points_0,  /// input: 2D image points in the 1st image.
-        const std::vector<Vector2D> &points_1,  /// input: 2D image points in the 2nd image.
-        std::vector<Vector3D> &points_3d,       /// output: reconstructed 3D points
-        Matrix33 &R,   /// output: 3 by 3 matrix, which is the recovered rotation of the 2nd camera
-        Vector3D &t    /// output: 3D vector, which is the recovered translation of the 2nd camera
+        double fx, double fy,
+        double cx, double cy,
+        double s,
+        const std::vector<Vector2D> &points_0,
+        const std::vector<Vector2D> &points_1,
+        std::vector<Vector3D> &points_3d,
+        Matrix33 &R,
+        Vector3D &t
 ) const
 {
     //--------------------------------------------------------------------------------------------------------------
     // implementation starts ...
-
     try {
         // check if the input is valid (always good because you never known how others will call your function).
-        int n_0 = points_0.size();
-        int n_1 = points_1.size();
-        if (n_0 < 6) throw std::invalid_argument("number of correspondences must >= 8, got " + std::to_string(n_0));
-        if (n_1 < 6) throw std::invalid_argument("number of correspondences must >= 8, got " + std::to_string(n_1));
-        if (n_0 != n_1) throw std::invalid_argument("amount of points from both camera must match, got " + std::to_string(n_0) + " and " + std::to_string(n_1));
+        int n0 = points_0.size();
+        int n1 = points_1.size();
+        if (n0 < 8) throw std::invalid_argument("number of correspondences must >= 8, got " + std::to_string(n0));
+        if (n1 < 8) throw std::invalid_argument("number of correspondences must >= 8, got " + std::to_string(n1));
+        if (n0 != n1) throw std::invalid_argument("amount of points from both camera must match, got " + std::to_string(n0) + " and " + std::to_string(n1));
 
 
         // Estimate relative pose of two views. This can be subdivided into
         // estimate the fundamental matrix F;
         std::vector<Vector2D> norm_points_0, norm_points_1;
-        Matrix33 T_0, T_1;
-        norm_transformation(points_0, norm_points_0, T_0);
-        norm_transformation(points_1, norm_points_1, T_1);
+        Matrix33 T0, T1;
+        norm_transformation(points_0, norm_points_0, T0);
+        norm_transformation(points_1, norm_points_1, T1);
 
-        Matrix W = cal_matrix_W(n_0, norm_points_0, norm_points_1);
-        Matrix U(n_0, n_0, 0.0), S(n_0, 9, 0.0), V(9, 9, 0.0);
+        Matrix W = cal_matrix_W(n0, norm_points_0, norm_points_1);
+        Matrix U(n0, n0, 0.0), S(n0, 9, 0.0), V(9, 9, 0.0);
         svd_decompose(W, U, S, V);
 
         Matrix F(3, 3, V.get_column(8).data());
@@ -120,12 +132,12 @@ bool Triangulation::triangulation(
         V = Matrix(3, 3, 0.0);
         Matrix D(3, 3, 0.0);
         svd_decompose(F, U, D, V);
-        S.set(2, 2, 0.0);
+        D.set(2, 2, 0.0);
 
         F = U*D*V;
-        F = T_1.transpose() * F * T_0;
+        F = T1.transpose() * F * T0;
 
-        // compute the essential matrix E;
+        // compute the essential matrix E
         Matrix33 K({fx, s, cx, 0, fy, cy, 0, 0, 1});
         Matrix33 E = K.transpose() * F * K;
 
@@ -149,6 +161,9 @@ bool Triangulation::triangulation(
         if (determinant(R1) < 0) R1 = -R1;
         if (determinant(R2) < 0) R2 = -R2;
 
+        std::cout << R1 << std::endl;
+        std::cout << R2 << std::endl;
+
         // Translation is the last column of U (up to scale)
         Vector3D t1(U_e.get_column(2)[0], U_e.get_column(2)[1], U_e.get_column(2)[2]);
         Vector3D t2 = -t1;
@@ -156,18 +171,61 @@ bool Triangulation::triangulation(
         // Four possible combinations of R and t
         std::vector<Matrix33> rotations = {R1, R1, R2, R2};
         std::vector<Vector3D> translations = {t1, t2, t1, t2};
-
-        // Test R and t
-        Vector2D test_point_0 = points_0[0], test_point_1 = points_1[0];
-        for (int i; i < 4; i++){
-            Vector3D P = test_point_0.homogeneous();
-            Vector3D Q = rotations[i]*test_point_1.homogeneous() + translations[i];
+        std::vector<int> counter = {0, 0, 0, 0};
+        for (int i=0; i < 4; i++){
+            for (int j = 0; j < n0; j++) {
+                Vector3D temp_P = inverse(K) * points_0[j].homogeneous();
+                Vector3D Q = rotations[i] * temp_P + translations[i];
+                Vector3D temp_Q = inverse(K) * points_1[j].homogeneous();
+                Vector3D P = rotations[i].transpose() * (temp_Q - translations[i]);
+                if (P[2] > 0 && Q[2] > 0) {
+                    counter[i]++;
+                }
+            }
         }
 
+        auto maxIt = std::max_element(counter.begin(), counter.end());
+        int maxIndex = std::distance(counter.begin(), maxIt);
+        R = rotations[maxIndex];
+        t = translations[maxIndex];
+        std::cout << "n= " << n0 << std::endl;
+        std::cout << "R1t1 count= " << counter[0] << std::endl;
+        std::cout << "R1t2 count= " << counter[1] << std::endl;
+        std::cout << "R2t1 count= " << counter[2] << std::endl;
+        std::cout << "R2t2 count= " << counter[3] << std::endl;
+        std::cout << "Selected R" << maxIndex/2 + 1 << "t" << maxIndex%2 + 1 << std::endl;
+        std::cout << "Selected R:\n" << rotations[maxIndex] << std::endl;
+        std::cout << "Selected t:\n" << translations[maxIndex] << std::endl << std::endl;
 
+        // Reconstruct 3D points. The main task is
+        // triangulate a pair of image points (i.e., compute the 3D coordinates for each corresponding point pair)
+        Matrix KR = K*R;
+        Matrix M0(3, 4, {
+            K[0][0], K[0][1], K[0][2], 0,
+            K[1][0], K[1][1], K[1][2], 0,
+            K[2][0], K[2][1], K[2][2], 0
+        });
+        Matrix M1(3, 4, {
+            KR[0][0], KR[0][1], KR[0][2], t[0],
+            KR[1][0], KR[1][1], KR[1][2], t[1],
+            KR[2][0], KR[2][1], KR[2][2], t[2]
+        });
 
-        // TODO: Reconstruct 3D points. The main task is
-        //      - triangulate a pair of image points (i.e., compute the 3D coordinates for each corresponding point pair)
+        Matrix A(4, 4);
+        U = Matrix(4, 4, 0.0);
+        S = Matrix(4, 4, 0.0);
+        V = Matrix(4, 4, 0.0);
+        for (int i = 0; i < n0; i++) {
+            A.set_row(0, points_0[i].x() * M0.get_row(2) - M0.get_row(0));
+            A.set_row(1, points_0[i].y() * M0.get_row(2) - M0.get_row(1));
+            A.set_row(2, points_1[i].x() * M1.get_row(2) - M1.get_row(0));
+            A.set_row(3, points_1[i].y() * M1.get_row(2) - M1.get_row(1));
+
+            svd_decompose(A, U, S, V);
+            Vector4D P_homo = V.get_column(3);
+            points_3d.push_back(P_homo.cartesian());
+            // std::cout << "P= " << P_homo.cartesian() << std::endl;
+        }
 
         // TODO: Don't forget to
         //          - write your recovered 3D points into 'points_3d' (so the viewer can visualize the 3D points for you);
@@ -180,7 +238,6 @@ bool Triangulation::triangulation(
         //          - input not valid (e.g., not enough points, point numbers don't match);
         //          - encountered failure in any step.
         return points_3d.size() > 0;
-
     }
     catch(const std::exception& e) {
         std::cerr << e.what() << '\n';
