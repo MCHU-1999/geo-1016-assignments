@@ -76,24 +76,37 @@ Matrix cal_matrix_W (int n, const std::vector<Vector2D> &points_0, const std::ve
 }
 
 /**
- * TODO: Finish this function for reconstructing 3D geometry from corresponding image points.
- * @return True on success, otherwise false. On success, the reconstructed 3D points must be written to 'points_3d'
- *      and the recovered relative pose must be written to R and t.
+ * @brief Performs 3D point triangulation from two images.
+ *
+ * Given two sets of 2D point correspondences from two images and known camera intrinsics,
+ * this function reconstructs the 3D positions of the points and estimates the relative
+ * pose (rotation and translation) between the two cameras.
+ *
+ * @param[in] fx Focal length in the x direction (same for both cameras).
+ * @param[in] fy Focal length in the y direction (same for both cameras).
+ * @param[in] cx X-coordinate of the principal point (same for both cameras).
+ * @param[in] cy Y-coordinate of the principal point (same for both cameras).
+ * @param[in] s Skew factor (same for both cameras).
+ * @param[in] points_0 2D image points in the first image.
+ * @param[in] points_1 2D image points in the second image.
+ * @param[out] points_3d Reconstructed 3D points in world coordinates.
+ * @param[out] R 3×3 matrix representing the recovered rotation of the 2nd camera.
+ * @param[out] t 3D vector representing the recovered translation of the 2nd camera.
+ * @return True on success, otherwise false.
  */
 bool Triangulation::triangulation(
-        double fx, double fy,     /// input: the focal lengths (same for both cameras)
-        double cx, double cy,     /// input: the principal point (same for both cameras)
-        double s,                 /// input: the skew factor (same for both cameras)
-        const std::vector<Vector2D> &points_0,  /// input: 2D image points in the 1st image.
-        const std::vector<Vector2D> &points_1,  /// input: 2D image points in the 2nd image.
-        std::vector<Vector3D> &points_3d,       /// output: reconstructed 3D points
-        Matrix33 &R,   /// output: 3 by 3 matrix, which is the recovered rotation of the 2nd camera
-        Vector3D &t    /// output: 3D vector, which is the recovered translation of the 2nd camera
+        double fx, double fy,
+        double cx, double cy,
+        double s,
+        const std::vector<Vector2D> &points_0,
+        const std::vector<Vector2D> &points_1,
+        std::vector<Vector3D> &points_3d,
+        Matrix33 &R,
+        Vector3D &t
 ) const
 {
     //--------------------------------------------------------------------------------------------------------------
     // implementation starts ...
-
     try {
         // check if the input is valid (always good because you never known how others will call your function).
         int n0 = points_0.size();
