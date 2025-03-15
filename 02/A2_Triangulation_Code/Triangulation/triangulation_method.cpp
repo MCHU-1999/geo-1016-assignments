@@ -549,7 +549,7 @@ bool Triangulation::triangulation(
     return true;
 }
 
-// Make sure this function is declared in the Triangulation header file
+
 static bool solve_linear_system(const Matrix& A, const Vector& b, Vector& x) {
     try {
         Matrix A_inv = inverse(A);
