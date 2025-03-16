@@ -294,7 +294,7 @@ bool nonlinear_refinement(
     const std::vector<Vector2D>& points_1,
     std::vector<Vector3D>& points_3d
 ) {
-    const int max_iterations = 10;  // Maximum number of iterations
+    const int max_iterations = 10000;  // Maximum number of iterations
     const double epsilon = 1e-8;    // Convergence threshold
 
     int num_points = points_3d.size();
