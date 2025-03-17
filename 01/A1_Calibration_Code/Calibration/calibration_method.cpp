@@ -75,20 +75,46 @@ std::vector<Vector2D> project_3D_to_2D(
     return projected_points;
 }
 
-// Free function: Computes the reprojection error between projected points and the original image points.
-std::vector<double> compute_reprojection_error(
+/**
+ * Computes the PAIRWISE L2 loss for each pair of 2D points.
+ *
+ * @param projected_points A vector of 2D points representing the projected positions.
+ * @param image_points A vector of 2D points representing the ground truth positions.
+ * @return A vector containing the squared Euclidean distance (L2 loss) for each corresponding pair.
+ */
+std::vector<double> compute_L2_loss(
     const std::vector<Vector2D>& projected_points,
     const std::vector<Vector2D>& image_points
 ) {
     assert(projected_points.size() == image_points.size());
-    double error = 0.0;
     std::vector<double> error_vec;
     int n = projected_points.size();
     for (int i = 0; i < n; ++i) {
         double dx = projected_points[i].x() - image_points[i].x();
         double dy = projected_points[i].y() - image_points[i].y();
-        error = std::sqrt(dx * dx + dy * dy);
-        error_vec.push_back(error);
+        error_vec.push_back(dx * dx + dy * dy);
+    }
+    return error_vec;
+}
+
+/**
+ * Computes the Euclidean distance for each pair of 2D points.
+ *
+ * @param projected_points A vector of 2D points representing the projected positions.
+ * @param image_points A vector of 2D points representing the ground truth positions.
+ * @return A vector containing the Euclidean distance for each corresponding pair.
+ */
+std::vector<double> compute_euclidean_dis(
+    const std::vector<Vector2D>& projected_points,
+    const std::vector<Vector2D>& image_points
+) {
+    assert(projected_points.size() == image_points.size());
+    std::vector<double> error_vec;
+    int n = projected_points.size();
+    for (int i = 0; i < n; ++i) {
+        double dx = projected_points[i].x() - image_points[i].x();
+        double dy = projected_points[i].y() - image_points[i].y();
+        error_vec.push_back(std::sqrt(dx * dx + dy * dy));
     }
     return error_vec;
 }
@@ -229,17 +255,17 @@ bool Calibration::calibration(
         // =====================================================================================================================
 
         std::vector<Vector2D> projected_2d = project_3D_to_2D(points_3d, K, R, t);
-        auto err_vec = compute_reprojection_error(projected_2d, points_2d);
+        auto loss_arr = compute_L2_loss(projected_2d, points_2d);
 
-        std::cout << "the projected\t|  ground truth\t|  error" << std::endl;
+        std::cout << "the projected\t|  ground truth\t|  L2 loss" << std::endl;
         for (size_t i = 0; i < projected_2d.size(); i++) {
-            std::cout << projected_2d[i] << "\t|  " << points_2d[i] << "\t|  " << err_vec[i] << std::endl;
+            std::cout << projected_2d[i] << "\t|  " << points_2d[i] << "\t|  " << loss_arr[i] << std::endl;
         }
-        double err_sum = 0.0;
-        for (double num: err_vec) {
-            err_sum += num;
+        double loss_sum = 0.0;
+        for (double loss: loss_arr) {
+            loss_sum += loss;
         }
-        std::cout << "the reprojection error (avg): " << err_sum/err_vec.size() << std::endl;
+        std::cout << "The reprojection error: " << loss_sum << std::endl;
 
         return true;
     }
