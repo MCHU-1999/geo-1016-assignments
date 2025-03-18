@@ -28,6 +28,8 @@
 
 using namespace easy3d;
 
+static bool solve_linear_system(const Matrix& A, const Vector& b, Vector& x);
+
 void norm_transformation(const std::vector<Vector2D>& points, std::vector<Vector2D>& norm_points, Matrix33& T) {
     // Calculate centroid
     Vector2D centroid(0, 0);
@@ -465,9 +467,6 @@ bool Triangulation::triangulation(
         return false;
     }
 }
-
-
-
 
 static bool solve_linear_system(const Matrix& A, const Vector& b, Vector& x) {
     try {
