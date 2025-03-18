@@ -47,11 +47,11 @@ void normalisePoints(const std::vector<Vector2D>& points, std::vector<Vector2D>&
     centroid /= N;
 
     // Normalise the scale, the mean distance from the centroid should be sqrt(2)
-    double scale = 0.0;
+    double distance = 0.0;
     for (const auto& p : points) {
-        scale += (p - centroid).norm();
+        distance += (p - centroid).norm();
     }
-    scale = sqrt(2.0) / (scale / N);
+    double scale = sqrt(2.0) / (distance / N);
 
     // Construct similarity transformation matrix
     T = Matrix33(scale, 0, -scale * centroid.x(),
@@ -217,7 +217,8 @@ bool Triangulation::triangulation(
     // #2 Compute the essential matrix E
     // =============================================================================================================
 
-    // TODO
+    Matrix33 K({fx, s, cx, 0, fy, cy, 0, 0, 1});
+    Matrix33 E = K.transpose() * F * K;
 
     // =============================================================================================================
     // #3 Recover rotation R and t
