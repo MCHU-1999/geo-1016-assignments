@@ -37,50 +37,48 @@ using namespace easy3d;
 class TriangulationObjective : public Objective_LM {
 public:
     TriangulationObjective(
-        const Matrix34& P1,
-        const Matrix34& P2,
-        const Vector2D& point_0,
-        const Vector2D& point_1
-    ) : Objective_LM(4, 3), // 4 functions (x,y for each view), 3 variables (X,Y,Z)
-        P1_(P1),
-        P2_(P2),
-        point_0_(point_0),
-        point_1_(point_1)
+    const Matrix34& P1,
+    const Matrix34& P2,
+    const std::vector<Vector2D>& points_0,
+    const std::vector<Vector2D>& points_1
+) : Objective_LM(4 * points_0.size(), 3 * points_0.size()), // 4N functions, 3N variables
+    P1_(P1),
+    P2_(P2),
+    points_0_(points_0),
+    points_1_(points_1)
     {}
 
-    /**
-     *  Calculate the values of each function at x and return the function values as a vector in fvec.
-     *  @param  x           The current values of variables.
-     *  @param  fvec        Return the value vector of all the functions.
-     *  @return Return a negative value to terminate.
-     */
     int evaluate(const double *x, double *fvec) override {
-        // Create homogeneous 3D point
-        Vector4D point_homo(x[0], x[1], x[2], 1.0);
+        int n = points_0_.size();
+        for (int i = 0; i < n; ++i) {
+            // Extract 3D point coordinates
+            double X = x[3 * i];
+            double Y = x[3 * i + 1];
+            double Z = x[3 * i + 2];
 
-        // Project to first image
-        Vector3D proj1 = P1_ * point_homo;
-        Vector2D p1_proj(proj1.x() / proj1.z(), proj1.y() / proj1.z());
+            // Project to first image
+            Vector4D point_homo(X, Y, Z, 1.0);
+            Vector3D proj1 = P1_ * point_homo;
+            Vector2D p1_proj(proj1.x() / proj1.z(), proj1.y() / proj1.z());
 
-        // Project to second image
-        Vector3D proj2 = P2_ * point_homo;
-        Vector2D p2_proj(proj2.x() / proj2.z(), proj2.y() / proj2.z());
+            // Project to second image
+            Vector3D proj2 = P2_ * point_homo;
+            Vector2D p2_proj(proj2.x() / proj2.z(), proj2.y() / proj2.z());
 
-        // Compute reprojection errors (x,y for each camera)
-        fvec[0] = point_0_.x() - p1_proj.x();
-        fvec[1] = point_0_.y() - p1_proj.y();
-        fvec[2] = point_1_.x() - p2_proj.x();
-        fvec[3] = point_1_.y() - p2_proj.y();
-
+            // Compute reprojection errors
+            fvec[4 * i] = points_0_[i].x() - p1_proj.x();
+            fvec[4 * i + 1] = points_0_[i].y() - p1_proj.y();
+            fvec[4 * i + 2] = points_1_[i].x() - p2_proj.x();
+            fvec[4 * i + 3] = points_1_[i].y() - p2_proj.y();
+        }
         return 0;
     }
 
 private:
-    Matrix34 P1_;     // Projection matrix for first camera
-    Matrix34 P2_;     // Projection matrix for second camera
-    Vector2D point_0_; // Observed 2D point in first image
-    Vector2D point_1_; // Observed 2D point in second image
+    Matrix34 P1_, P2_;
+    std::vector<Vector2D> points_0_, points_1_;
 };
+
 
 /**
  * Refine a 3D point using Levenberg-Marquardt optimization
@@ -91,33 +89,39 @@ private:
  * @param point_3d Initial 3D point to be refined
  * @return true if optimization succeeded
  */
-bool refine_point(
+bool refine_all_points(
     const Matrix34& P1,
     const Matrix34& P2,
-    const Vector2D& point_0,
-    const Vector2D& point_1,
-    Vector3D& point_3d
+    const std::vector<Vector2D>& points_0,
+    const std::vector<Vector2D>& points_1,
+    std::vector<Vector3D>& points_3d
 ) {
     // Create the objective function
-    TriangulationObjective obj(P1, P2, point_0, point_1);
+    TriangulationObjective obj(P1, P2, points_0, points_1);
 
     // Create optimizer
     Optimizer_LM lm;
 
-    // Initialize with current point estimate
-    std::vector<double> x = {point_3d.x(), point_3d.y(), point_3d.z()};
+    // Initialize with current point estimates
+    std::vector<double> x;
+    for (const auto& point : points_3d) {
+        x.push_back(point.x());
+        x.push_back(point.y());
+        x.push_back(point.z());
+    }
 
     // Optimize to minimize reprojection error
     bool status = lm.optimize(&obj, x);
 
     if (status) {
-        // Update the 3D point with refined coordinates
-        point_3d = Vector3D(x[0], x[1], x[2]);
+        // Update all 3D points with refined coordinates
+        for (int i = 0; i < points_3d.size(); ++i) {
+            points_3d[i] = Vector3D(x[3 * i], x[3 * i + 1], x[3 * i + 2]);
+        }
     }
 
     return status;
 }
-
 
 void norm_transformation(const std::vector<Vector2D>& points, std::vector<Vector2D>& norm_points, Matrix33& T) {
     // Calculate centroid
@@ -276,7 +280,7 @@ double compute_reprojection_error(
     }
 
     // Return average reprojection error
-    return total_error / (2.0 * n);  // Average error per point per image
+    return total_error;  // Average error per point per image
 }
 
 /**
@@ -438,6 +442,12 @@ bool Triangulation::triangulation(
         // 11. Use triangulated points from the best configuration
         points_3d = all_points_3d[best_config];
 
+        // =============================================================================================================
+        // #13 Calculate reprojection error
+        // =============================================================================================================
+        double reproj_error_l = compute_reprojection_error(K, R, t, points_0, points_1, points_3d);
+        std::cout << "Reprojection error linear: " << reproj_error_l << std::endl;
+
         // // =============================================================================================================
         // #12 Non-linear refinement of triangulated points
         // =============================================================================================================
@@ -452,6 +462,7 @@ bool Triangulation::triangulation(
             R[1][0], R[1][1], R[1][2], t.y(),
             R[2][0], R[2][1], R[2][2], t.z()
         });
+        Matrix34 M = K * M0;
         Matrix34 M1 = K * Rt;
 
         // // Perform non-linear refinement
@@ -461,37 +472,23 @@ bool Triangulation::triangulation(
         //     return false;
         // }
 
-        int num_refined = 0;
-        for (int i = 0; i < points_3d.size(); ++i) {
-            // Create the objective function for the current point
-            TriangulationObjective obj(M0, M1, points_0[i], points_1[i]);
-
-            // Create optimizer
-            Optimizer_LM lm;
-
-            // Initialize with current point estimate
-            std::vector<double> x = {points_3d[i].x(), points_3d[i].y(), points_3d[i].z()};
-
-            // Optimize to minimize reprojection error
-            bool status = lm.optimize(&obj, x);
-
-            if (status) {
-                // Update the 3D point with refined coordinates
-                points_3d[i] = Vector3D(x[0], x[1], x[2]);
-                num_refined++;
-            }
+        // Perform non-linear refinement for all points
+        bool refinement_success = refine_all_points(M, M1, points_0, points_1, points_3d);
+        if (!refinement_success) {
+            std::cerr << "Non-linear refinement failed." << std::endl;
+            return false;
         }
 
-        std::cout << "Refined " << num_refined << " out of " << points_3d.size() << " points" << std::endl;
-        return num_refined > 0;
 
         // =============================================================================================================
         // #13 Calculate reprojection error
         // =============================================================================================================
         double reproj_error = compute_reprojection_error(K, R, t, points_0, points_1, points_3d);
-        std::cout << "Average reprojection error: " << reproj_error << std::endl;
+        std::cout << "Reprojection error non linear: " << reproj_error << std::endl;
 
         return true;
+
+
     }
     catch (const std::exception& e) {
         std::cerr << "Triangulation error: " << e.what() << std::endl;
