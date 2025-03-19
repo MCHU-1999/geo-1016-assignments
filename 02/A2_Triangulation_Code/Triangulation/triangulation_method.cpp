@@ -28,9 +28,96 @@
 #include <numeric>
 #include <cmath>
 
+
 using namespace easy3d;
 
-static bool solve_linear_system(const Matrix& A, const Vector& b, Vector& x);
+/// To use the Levenberg-Marquardt method to solve a non-linear least squares method, we need to define our own
+/// objective function that inherits 'Objective_LM'.
+
+class TriangulationObjective : public Objective_LM {
+public:
+    TriangulationObjective(
+        const Matrix34& P1,
+        const Matrix34& P2,
+        const Vector2D& point_0,
+        const Vector2D& point_1
+    ) : Objective_LM(4, 3), // 4 functions (x,y for each view), 3 variables (X,Y,Z)
+        P1_(P1),
+        P2_(P2),
+        point_0_(point_0),
+        point_1_(point_1)
+    {}
+
+    /**
+     *  Calculate the values of each function at x and return the function values as a vector in fvec.
+     *  @param  x           The current values of variables.
+     *  @param  fvec        Return the value vector of all the functions.
+     *  @return Return a negative value to terminate.
+     */
+    int evaluate(const double *x, double *fvec) override {
+        // Create homogeneous 3D point
+        Vector4D point_homo(x[0], x[1], x[2], 1.0);
+
+        // Project to first image
+        Vector3D proj1 = P1_ * point_homo;
+        Vector2D p1_proj(proj1.x() / proj1.z(), proj1.y() / proj1.z());
+
+        // Project to second image
+        Vector3D proj2 = P2_ * point_homo;
+        Vector2D p2_proj(proj2.x() / proj2.z(), proj2.y() / proj2.z());
+
+        // Compute reprojection errors (x,y for each camera)
+        fvec[0] = point_0_.x() - p1_proj.x();
+        fvec[1] = point_0_.y() - p1_proj.y();
+        fvec[2] = point_1_.x() - p2_proj.x();
+        fvec[3] = point_1_.y() - p2_proj.y();
+
+        return 0;
+    }
+
+private:
+    Matrix34 P1_;     // Projection matrix for first camera
+    Matrix34 P2_;     // Projection matrix for second camera
+    Vector2D point_0_; // Observed 2D point in first image
+    Vector2D point_1_; // Observed 2D point in second image
+};
+
+/**
+ * Refine a 3D point using Levenberg-Marquardt optimization
+ * @param P1 Projection matrix for first camera
+ * @param P2 Projection matrix for second camera
+ * @param point_0 Observed 2D point in first image
+ * @param point_1 Observed 2D point in second image
+ * @param point_3d Initial 3D point to be refined
+ * @return true if optimization succeeded
+ */
+bool refine_point(
+    const Matrix34& P1,
+    const Matrix34& P2,
+    const Vector2D& point_0,
+    const Vector2D& point_1,
+    Vector3D& point_3d
+) {
+    // Create the objective function
+    TriangulationObjective obj(P1, P2, point_0, point_1);
+
+    // Create optimizer
+    Optimizer_LM lm;
+
+    // Initialize with current point estimate
+    std::vector<double> x = {point_3d.x(), point_3d.y(), point_3d.z()};
+
+    // Optimize to minimize reprojection error
+    bool status = lm.optimize(&obj, x);
+
+    if (status) {
+        // Update the 3D point with refined coordinates
+        point_3d = Vector3D(x[0], x[1], x[2]);
+    }
+
+    return status;
+}
+
 
 void norm_transformation(const std::vector<Vector2D>& points, std::vector<Vector2D>& norm_points, Matrix33& T) {
     // Calculate centroid
@@ -86,129 +173,46 @@ Matrix cal_matrix_W(int n, const std::vector<Vector2D>& points_0, const std::vec
 }
 
 
-/**
- * Non-linear refinement of triangulated points using Gauss-Newton method
- * @param M0 Projection matrix for the first camera
- * @param M1 Projection matrix for the second camera
- * @param points_0 Points from first image
- * @param points_1 Points from second image
- * @param points_3d Input/output 3D points to be refined
- * @return True if refinement was successful
- */
-bool nonlinear_refinement(
-    const Matrix& M0,
-    const Matrix& M1,
-    const std::vector<Vector2D>& points_0,
-    const std::vector<Vector2D>& points_1,
-    std::vector<Vector3D>& points_3d
-) {
-    const int max_iterations = 1000;  // Maximum number of iterations
-    const double epsilon = 1e-6;    // Convergence threshold
-
-    int num_points = points_3d.size();
-    bool success = true;
-
-    // Refine each point individually
-    for (int i = 0; i < num_points; ++i) {
-        Vector3D& P = points_3d[i];
-        Vector2D p0 = points_0[i];
-        Vector2D p1 = points_1[i];
-
-        bool converged = false;
-        for (int iter = 0; iter < max_iterations && !converged; ++iter) {
-            // Project 3D point to both images
-            Vector4D P_homo(P.x(), P.y(), P.z(), 1.0);
-
-            // Compute projection in first camera
-            Vector3D proj0 = M0 * P_homo;
-            Vector2D p0_proj(proj0.x() / proj0.z(), proj0.y() / proj0.z());
-
-            // Compute projection in second camera
-            Vector3D proj1 = M1 * P_homo;
-            Vector2D p1_proj(proj1.x() / proj1.z(), proj1.y() / proj1.z());
-
-            // Compute residuals
-            Vector2D e0 = p0 - p0_proj;
-            Vector2D e1 = p1 - p1_proj;
-
-            // Build the Jacobian matrix (2n×3 for n cameras, here n=2)
-            Matrix J(4, 3, 0.0);
-
-            // Compute Jacobian for first camera
-            double x = proj0.x(), y = proj0.y(), z = proj0.z();
-            double z2 = z * z;
-
-            // d(x/z)/dX, d(x/z)/dY, d(x/z)/dZ
-            J.set_row(0, {
-                M0(0, 0) / z - x * M0(2, 0) / z2,
-                M0(0, 1) / z - x * M0(2, 1) / z2,
-                M0(0, 2) / z - x * M0(2, 2) / z2
-            });
-
-            // d(y/z)/dX, d(y/z)/dY, d(y/z)/dZ
-            J.set_row(1, {
-                M0(1, 0) / z - y * M0(2, 0) / z2,
-                M0(1, 1) / z - y * M0(2, 1) / z2,
-                M0(1, 2) / z - y * M0(2, 2) / z2
-            });
-
-            // Compute Jacobian for second camera
-            x = proj1.x();
-            y = proj1.y();
-            z = proj1.z();
-            z2 = z * z;
-
-            // d(x/z)/dX, d(x/z)/dY, d(x/z)/dZ
-            J.set_row(2, {
-                M1(0, 0) / z - x * M1(2, 0) / z2,
-                M1(0, 1) / z - x * M1(2, 1) / z2,
-                M1(0, 2) / z - x * M1(2, 2) / z2
-            });
-
-            // d(y/z)/dX, d(y/z)/dY, d(y/z)/dZ
-            J.set_row(3, {
-                M1(1, 0) / z - y * M1(2, 0) / z2,
-                M1(1, 1) / z - y * M1(2, 1) / z2,
-                M1(1, 2) / z - y * M1(2, 2) / z2
-            });
-
-            // Create residual vector e
-            Vector e(4);
-            e[0] = e0.x();
-            e[1] = e0.y();
-            e[2] = e1.x();
-            e[3] = e1.y();
-
-            // Compute J^T * J
-            Matrix JtJ = J.transpose() * J;
-
-            // Compute J^T * e
-            Vector Jte = J.transpose() * e;
-
-            // Solve for the update: (J^T * J) * delta_P = J^T * e
-            Vector delta_P(3);
-            bool solved = solve_linear_system(JtJ, Jte, delta_P);
-
-            if (!solved) {
-                // If the system couldn't be solved, skip this point
-                success = false;
-                break;
-            }
-
-            // Update the 3D point
-            P.x() += delta_P[0];
-            P.y() += delta_P[1];
-            P.z() += delta_P[2];
-
-            // Check for convergence
-            if (delta_P.length() < epsilon) {
-                converged = true;
-            }
-        }
-    }
-
-    return success;
-}
+// /**
+//  * Non-linear refinement of triangulated points using Levenberg-Marquardt optimization
+//  * @param P1 Projection matrix for first camera
+//  * @param P2 Projection matrix for second camera
+//  * @param points_0 2D points from first image
+//  * @param points_1 2D points from second image
+//  * @param points_3d Initial triangulated 3D points (will be refined)
+//  * @return True on success, false on failure
+//  */
+// bool Triangulation::nonlinear_refinement(
+//     const Matrix34& P1,
+//     const Matrix34& P2,
+//     const std::vector<Vector2D>& points_0,
+//     const std::vector<Vector2D>& points_1,
+//     std::vector<Vector3D>& points_3d) const
+// {
+//     int num_refined = 0;
+//     for (int i = 0; i < points_3d.size(); ++i) {
+//         // Create the objective function for the current point
+//         TriangulationObjective obj(P1, P2, points_0[i], points_1[i]);
+//
+//         // Create optimizer
+//         Optimizer_LM lm;
+//
+//         // Initialize with current point estimate
+//         std::vector<double> x = {points_3d[i].x(), points_3d[i].y(), points_3d[i].z()};
+//
+//         // Optimize to minimize reprojection error
+//         bool status = lm.optimize(&obj, x);
+//
+//         if (status) {
+//             // Update the 3D point with refined coordinates
+//             points_3d[i] = Vector3D(x[0], x[1], x[2]);
+//             num_refined++;
+//         }
+//     }
+//
+//     std::cout << "Refined " << num_refined << " out of " << points_3d.size() << " points" << std::endl;
+//     return num_refined > 0;
+// }
 
 /**
  * Calculate reprojection error for triangulated points
@@ -434,28 +438,52 @@ bool Triangulation::triangulation(
         // 11. Use triangulated points from the best configuration
         points_3d = all_points_3d[best_config];
 
-        // =============================================================================================================
-        // // #12 Non-linear refinement of triangulated points
         // // =============================================================================================================
-        // // Build projection matrices for camera 1 and camera 2.
-        // Matrix34 M0({   // First camera at origin [I|0]
-        //     1, 0, 0, 0,
-        //     0, 1, 0, 0,
-        //     0, 0, 1, 0
-        // });
-        // Matrix34 Rt({   // Second camera [R|t]
-        //     R[0][0], R[0][1], R[0][2], t.x(),
-        //     R[1][0], R[1][1], R[1][2], t.y(),
-        //     R[2][0], R[2][1], R[2][2], t.z()
-        // });
-        // Matrix34 M1 = K * Rt;
-        //
+        // #12 Non-linear refinement of triangulated points
+        // =============================================================================================================
+        // Build projection matrices for camera 1 and camera 2.
+        Matrix34 M0({   // First camera at origin [I|0]
+            1, 0, 0, 0,
+            0, 1, 0, 0,
+            0, 0, 1, 0
+        });
+        Matrix34 Rt({   // Second camera [R|t]
+            R[0][0], R[0][1], R[0][2], t.x(),
+            R[1][0], R[1][1], R[1][2], t.y(),
+            R[2][0], R[2][1], R[2][2], t.z()
+        });
+        Matrix34 M1 = K * Rt;
+
         // // Perform non-linear refinement
         // bool refinement_success = nonlinear_refinement(M0, M1, points_0, points_1, points_3d);
         // if (!refinement_success) {
         //     std::cerr << "Non-linear refinement failed." << std::endl;
         //     return false;
         // }
+
+        int num_refined = 0;
+        for (int i = 0; i < points_3d.size(); ++i) {
+            // Create the objective function for the current point
+            TriangulationObjective obj(M0, M1, points_0[i], points_1[i]);
+
+            // Create optimizer
+            Optimizer_LM lm;
+
+            // Initialize with current point estimate
+            std::vector<double> x = {points_3d[i].x(), points_3d[i].y(), points_3d[i].z()};
+
+            // Optimize to minimize reprojection error
+            bool status = lm.optimize(&obj, x);
+
+            if (status) {
+                // Update the 3D point with refined coordinates
+                points_3d[i] = Vector3D(x[0], x[1], x[2]);
+                num_refined++;
+            }
+        }
+
+        std::cout << "Refined " << num_refined << " out of " << points_3d.size() << " points" << std::endl;
+        return num_refined > 0;
 
         // =============================================================================================================
         // #13 Calculate reprojection error
@@ -474,14 +502,3 @@ bool Triangulation::triangulation(
 
 
 
-static bool solve_linear_system(const Matrix& A, const Vector& b, Vector& x) {
-    try {
-        Matrix A_inv = inverse(A);
-        x = A_inv * b;
-        return true;
-    }
-    catch (const std::exception& e) {
-        std::cerr << "Error solving linear system: " << e.what() << std::endl;
-        return false;
-    }
-}
