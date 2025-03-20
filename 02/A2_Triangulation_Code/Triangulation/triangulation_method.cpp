@@ -453,7 +453,7 @@ bool linear_triangulation(
 
 double cal_reprojection_error(
     const Matrix33& K, const Matrix33& R, const Vector3D& t,
-    const std::vector<Vector2D>& points_0, const std::vector<Vector2D>& points_1,
+    const std::vector<Vector2D>& points_0, const std::vector<Vector2D>& points_1, //points_0 and points_1 are the corresponding 2D pixel locations (ground truth)
     const std::vector<Vector3D>& points_3d
 ) {
     int n = points_3d.size();
