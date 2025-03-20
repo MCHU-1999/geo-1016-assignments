@@ -25,18 +25,9 @@
 #include "triangulation.h"
 #include "matrix_algo.h"
 #include <easy3d/optimizer/optimizer_lm.h>
-#include <cmath>
 
 using namespace easy3d;
 
-/**
- * @brief Solves a linear system Ax = b.
- * @param A Coefficient matrix.
- * @param b Right-hand side vector.
- * @param x Solution vector.
- * @return True if the system is solvable.
- */
-static bool solve_linear_system(const Matrix& A, const Vector& b, Vector& x);
 
 /**
  * @brief Normalizes 2D points for numerical stability.
@@ -299,18 +290,6 @@ bool Triangulation::triangulation(
         std::cout << "Reprojection error: " << reproj_error_after << std::endl;
         std::cout << "Avg. reprojection error: " << reproj_error_after/n0 << "\n" << std::endl;
 
-        return true;
-    }
-    catch (const std::exception& e) {
-        std::cerr << "Triangulation error: " << e.what() << std::endl;
-        return false;
-    }
-}
-
-static bool solve_linear_system(const Matrix& A, const Vector& b, Vector& x) {
-    try {
-        Matrix A_inv = inverse(A);
-        x = A_inv * b;
         return true;
     }
     catch (const std::exception& e) {
