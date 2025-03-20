@@ -176,48 +176,6 @@ Matrix cal_matrix_W(int n, const std::vector<Vector2D>& points_0, const std::vec
     return W;
 }
 
-
-// /**
-//  * Non-linear refinement of triangulated points using Levenberg-Marquardt optimization
-//  * @param P1 Projection matrix for first camera
-//  * @param P2 Projection matrix for second camera
-//  * @param points_0 2D points from first image
-//  * @param points_1 2D points from second image
-//  * @param points_3d Initial triangulated 3D points (will be refined)
-//  * @return True on success, false on failure
-//  */
-// bool Triangulation::nonlinear_refinement(
-//     const Matrix34& P1,
-//     const Matrix34& P2,
-//     const std::vector<Vector2D>& points_0,
-//     const std::vector<Vector2D>& points_1,
-//     std::vector<Vector3D>& points_3d) const
-// {
-//     int num_refined = 0;
-//     for (int i = 0; i < points_3d.size(); ++i) {
-//         // Create the objective function for the current point
-//         TriangulationObjective obj(P1, P2, points_0[i], points_1[i]);
-//
-//         // Create optimizer
-//         Optimizer_LM lm;
-//
-//         // Initialize with current point estimate
-//         std::vector<double> x = {points_3d[i].x(), points_3d[i].y(), points_3d[i].z()};
-//
-//         // Optimize to minimize reprojection error
-//         bool status = lm.optimize(&obj, x);
-//
-//         if (status) {
-//             // Update the 3D point with refined coordinates
-//             points_3d[i] = Vector3D(x[0], x[1], x[2]);
-//             num_refined++;
-//         }
-//     }
-//
-//     std::cout << "Refined " << num_refined << " out of " << points_3d.size() << " points" << std::endl;
-//     return num_refined > 0;
-// }
-
 /**
  * Calculate reprojection error for triangulated points
  * @param K Camera intrinsic matrix
