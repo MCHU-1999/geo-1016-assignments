@@ -277,6 +277,19 @@ bool Triangulation::triangulation(
         // Calculate reprojection error (2)
         // =============================================================================================================
         double reproj_error_after = cal_reprojection_error(K, R, t, points_0, points_1, points_3d);
+
+        // Print intrinsic parameters
+        std::cout << "\nCamera Intrinsic Parameters:" << std::endl;
+        std::cout << "---------------------------------------------" << std::endl;
+        std::cout << "fx: " << fx << ", fy: " << fy << std::endl;
+        std::cout << "cx: " << cx << ", cy: " << cy << std::endl;
+        std::cout << "s: " << s << std::endl;
+        // Print extrinsic parameters
+        std::cout << "\nExtrinsic Parameters:" << std::endl;
+        std::cout << "---------------------------------------------" << std::endl;
+        std::cout << "R:\n" << R << "\nt:\n" << t << std::endl;
+
+        // Print reprojection error values, before and after non-linear optimization
         std::cout << "\nBefore nonlinear refinement:" << std::endl;
         std::cout << "---------------------------------------------" << std::endl;
         std::cout << "Reprojection error: " << reproj_error_before << std::endl;
@@ -453,7 +466,7 @@ bool linear_triangulation(
 
 double cal_reprojection_error(
     const Matrix33& K, const Matrix33& R, const Vector3D& t,
-    const std::vector<Vector2D>& points_0, const std::vector<Vector2D>& points_1,
+    const std::vector<Vector2D>& points_0, const std::vector<Vector2D>& points_1, //points_0 and points_1 are the corresponding 2D pixel locations (ground truth)
     const std::vector<Vector3D>& points_3d
 ) {
     int n = points_3d.size();
