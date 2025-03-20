@@ -277,6 +277,16 @@ bool Triangulation::triangulation(
         // Calculate reprojection error (2)
         // =============================================================================================================
         double reproj_error_after = cal_reprojection_error(K, R, t, points_0, points_1, points_3d);
+
+        // Print intrinsic parameters
+        std::cout << "Camera Intrinsic Parameters:" << std::endl;
+        std::cout << "---------------------------------------------" << std::endl;
+        std::cout << "fx: " << fx << ", fy: " << fy << std::endl;
+        std::cout << "cx: " << cx << ", cy: " << cy << std::endl;
+        std::cout << "s: " << s << std::endl;
+        std::cout << "---------------------------------------------" << std::endl;
+
+        // Print reprojection error values, before and after non-linear optimization
         std::cout << "\nBefore nonlinear refinement:" << std::endl;
         std::cout << "---------------------------------------------" << std::endl;
         std::cout << "Reprojection error: " << reproj_error_before << std::endl;
