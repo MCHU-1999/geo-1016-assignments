@@ -1,9 +1,19 @@
 .DS_Store
 .vscode
 build/
+*.whl
+cmake-build-debug/
+*.zip
+
+# Assignment 1
 01/A1_Calibration_Code/cmake-build-debug/
 01/A1_Calibration_Code/.idea/
-cmake-build-debug/
+
+# Assignment 2
 02/A2_Triangulation_Code/.idea/
-*.zip
+
+# Assignment 3
 03/A3_Reconstruction_Data/
+03/polyfit/
+03/PolyFit-main/
+03/recon_result/snapshots/
